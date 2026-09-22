@@ -116,8 +116,9 @@ async def audit_response(ctx: AfterResponseContext) -> None:
             return
         try:
             result = await evaluate(request)
-        except Exception:
-            ctx.logger.warning("response_audit_check_failed", check=check.id)
+        except Exception as error:
+            # Provider exception text can contain private request data or credentials.
+            ctx.logger.warning("response_audit_check_failed", check=check.id, error_type=type(error).__name__)
             continue
         if result.failure is None and result.decision is True:
             findings.append(check)
