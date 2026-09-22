@@ -1,0 +1,23 @@
+name: Plugin compatibility
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plugin-compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  compatibility:
+    uses: mindroom-ai/mindroom/.github/workflows/plugin-ci.yml@v2026.9.232
+    with:
+      plugin_repository: ${{ github.repository }}
+      plugin_ref: ${{ github.sha }}
+      artifact_name: response-audit-jev-plugin
+      require_tests: true
