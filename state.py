@@ -6,6 +6,7 @@ import json
 import sqlite3
 import time
 from collections import OrderedDict
+from contextlib import closing
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -66,7 +67,7 @@ def prune() -> None:
 def claim_attempt(state_root: Path, agent: str, room: str, response_id: str) -> bool:
     """Reserve at most one audit attempt across replay/restart before any side effect."""
     state_root.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(state_root / "audit-attempts.sqlite3", timeout=1) as db:
+    with closing(sqlite3.connect(state_root / "audit-attempts.sqlite3", timeout=1)) as db, db:
         db.execute(
             "CREATE TABLE IF NOT EXISTS attempts (agent TEXT, room TEXT, response TEXT, PRIMARY "
             "KEY(agent, room, response))"
