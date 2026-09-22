@@ -1,150 +1,99 @@
-# Response Audit JEV Plugin
+# Response Audit JEV
 
-A MindRoom plugin that checks completed answers and asks the responding agent to correct likely citation or source-use problems.
-Uses TypeSafe JEV by default, through MindRoom's shared judgment layer.
-An existing LLM model alias can run the same checks.
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-plugins-blue)](https://docs.mindroom.chat/plugins/)
+[![Hooks](https://img.shields.io/badge/docs-hooks-blue)](https://docs.mindroom.chat/hooks/)
 
-The answer is delivered first.
-The plugin then audits it and posts **one combined follow-up in the same thread**, mentioning the agent.
-The follow-up is a request to verify a possible problem, not a claim that a model verdict proves the answer wrong.
-Replies to hook-generated messages are excluded, so a correction does not start another audit loop.
+<picture>
+  <source media="(prefers-reduced-motion: no-preference)" srcset="https://raw.githubusercontent.com/mindroom-ai/mindroom/main/assets/logo/logo-mark-animated.svg" />
+  <img src="https://raw.githubusercontent.com/mindroom-ai/mindroom/main/assets/logo/logo-mark.svg" alt="MindRoom Logo" align="right" width="120" />
+</picture>
+
+A [MindRoom](https://github.com/mindroom-ai/mindroom) hook plugin that uses [TypeSafe JEV](https://docs.typesafe.ai/api) to check completed answers and ask the responding agent to correct likely problems.
+
+The agent answers first.
+The plugin checks its citations and source use against the request and recorded tool activity, then posts one follow-up in the same thread, tagging the agent with specific correction guidance.
+Checks are configurable, so the same mechanism can review units, formatting, or other requirements.
+
+## Features
+
+- Audits selected agents after their answers are delivered
+- Includes citation and source-use checks, with support for custom questions
+- Uses JEV by default or an existing MindRoom LLM model alias
+- Checks recorded tool activity instead of treating the agent's lookup claims as evidence
+- Combines findings into one same-thread follow-up that mentions the agent
+- Skips hook-generated correction turns to prevent audit loops
+- Prevents repeated audit attempts across replay and restart
+- Uses existing public hooks and the shared judgment layer; no core changes or agent tools
+
+## How It Works
+
+1. An enabled agent receives a user request, and the plugin begins observing that turn.
+2. Tool hooks record completed calls, including arguments, results, and success/failure status.
+3. After the answer is delivered, JEV evaluates the request, answer, and tool evidence against each check.
+4. If checks flag a clear issue, the plugin posts one message mentioning the agent with their configured correction guidance.
+5. The agent handles that follow-up through MindRoom's normal permissions and dispatch flow.
+
+The audit requests verification; it does not prove an answer wrong.
+Missing or incomplete evidence stays quiet.
+The judge receives message and tool contents, so enable it only where sending those contents to the configured provider is appropriate.
+See [Evidence and Limits](docs/configuration.md#evidence-and-limits) for context bounds, privacy, and best-effort delivery behavior.
+
+## Hooks
+
+| Hook | Event | Purpose |
+|------|-------|---------|
+| `begin-response-audit` | `message:enrich` | Start observing an eligible turn without changing its prompt |
+| `record-audit-tool` | `tool:after_call` | Capture completed tool activity |
+| `audit-response` | `message:after_response` | Check the delivered answer and request corrections |
+| `discard-response-audit` | `message:cancelled` | Discard evidence for cancelled or failed replies |
+
+## Requirements
+
+MindRoom **v2026.9.232 or newer**, Python 3.13 or newer, and a `TYPESAFE_API_KEY` for JEV.
+An LLM judge uses the configured model alias's normal credentials instead.
 
 ## Install
 
-Requires MindRoom **v2026.9.232 or later** with the shared judgment and public hook APIs, and Python 3.13 or later.
+Vendor this plugin with the MindRoom CLI:
 
 ```bash
-git clone https://github.com/mindroom-ai/response-audit-jev-plugin.git plugins/response-audit-jev-plugin
+mindroom plugins install response-audit-jev-plugin
 ```
 
-Add the plugin to `config.yaml` and select the agents to audit:
-
-```yaml
-plugins:
-  - path: ./plugins/response-audit-jev-plugin
-    settings:
-      agents: [research]
-      source_tools: [search_data]  # Replace with your actual tool FUNCTION names
-      judgment:
-        provider: typesafe
-        threshold: 0.9
-        timeout_seconds: 1.5
-```
-
-Set `TYPESAFE_API_KEY` in the MindRoom instance environment or config-adjacent `.env`.
-Never put the key in this repository or plugin settings.
-The plugin uses MindRoom's pinned JEV client, including response validation, redaction checks, shared capacity limits, and deadlines.
-The threshold is a configurable starting point, not a calibrated guarantee of accuracy.
-See the [TypeSafe API](https://docs.typesafe.ai/api) for its probability-based judgment contract.
-
-`agents` defaults to `[]`: installing the plugin alone audits nobody.
-Settings follow the selected agents across their authorized rooms; teams are excluded.
-Source tool names are the actual functions reported by `tool:after_call`, not toolkit names such as `web` or `file`.
-Use the names of your configured search, database, or document-retrieval functions.
-
-## Default checks
-
-| Check | What it flags |
-| --- | --- |
-| `citations` | Clearly missing required citations or attribution contradicted by the supplied tool evidence |
-| `source_use` | Clearly missing required source consultation or lookup claims contradicted by observed tool activity |
-
-The source-use check runs only when `source_tools` is nonempty.
-The rubrics distinguish fresh verification from ordinary conversation, creative work, code-only answers, and answers based on data supplied by the user.
-A successful tool call is evidence that a function returned, not proof that every claim in its result is correct.
-The judge also inspects the result and relevance to the request.
-
-## Custom checks
-
-Providing `checks` **replaces** the defaults.
-Each check asks whether a specific actionable problem is present; a positive judgment triggers its fixed `feedback` text.
-The judge does not generate correction prose.
-
-```yaml
-plugins:
-  - path: ./plugins/response-audit-jev-plugin
-    settings:
-      agents: [research]
-      checks:
-        - id: units
-          instructions: >-
-            Does the answer give physical measurements without the units needed
-            to interpret them? Do not flag dimensionless quantities.
-          feedback: Add the missing measurement units and verify their consistency.
-```
-
-| Setting | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `agents` | list of names | `[]` | Agents enabled for audits; maximum 100 |
-| `source_tools` | list of function names | `[]` | Known source-access functions; maximum 100 |
-| `judgment` | object | TypeSafe, threshold `0.9`, timeout `1.5` seconds | Existing MindRoom judgment configuration |
-| `checks` | list | Citation and source-use checks | Between 1 and 8 checks, with unique IDs |
-| `checks[].id` | string | Required | Check identifier, 1–100 letters, digits, underscores or hyphens |
-| `checks[].instructions` | string | Required | Violation question, 1–2,000 characters |
-| `checks[].feedback` | string | Required | Correction guidance, 1–500 characters |
-| `checks[].requires_source_tools` | boolean | `false` | Skip this check unless source function names are configured |
-
-Unknown settings are rejected when hooks validate their configuration.
-Agent and source function names accept 1–100 letters, digits, underscores or hyphens.
-Changing check settings takes effect through MindRoom's normal plugin config reload.
-To use an LLM, replace `judgment` with an existing alias under `models`:
-
-```yaml
-judgment:
-  provider: llm
-  model: cheap
-  timeout_seconds: 5
-```
-
-Each configured check makes one sequential judgment call.
-There is no automatic backend fallback or application-level retry.
-LLM judgments return booleans; the probability threshold applies only to TypeSafe.
-Both backends reuse MindRoom's shared per-agent and process capacity limits.
-The after-response hook has a 30-second total timeout; each backend call also has its configured deadline.
-
-## Evidence and limits
-
-The judge receives the inbound request, the final delivered answer, configured source tool names, and observed tool names, statuses, arguments, and results **from that agent's current turn**.
-These contents are sent to the configured external judgment provider.
-No system prompt, memory, or complete conversation history is added.
-Credentials detected by MindRoom's redaction rules cause the entire audit to be skipped, rather than sending an altered evidence set.
-Those rules are not a general personal-data filter; message and tool contents may contain sensitive information.
-Only enable this plugin where that data transfer is appropriate.
-
-The plugin watches `message:enrich`, `tool:after_call`, `message:after_response`, and `message:cancelled`.
-It uses public hooks and adds no new core hook or agent tool.
-It does not browse citations itself and cannot prove factual correctness.
-Earlier conversation sources, provider-native tools, delegated work, and tool activity outside the observed turn are not fully visible.
-The rubrics treat these limitations as uncertainty, not automatic failure.
-
-Audits are skipped for attachments, missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, and non-AI/empty responses.
-Evidence is never silently truncated: at most 32 tool observations and a 16 KB shared judgment request.
-Only 128 pending turn captures are kept in memory, expiring after one hour.
-Restart, hot reload, expiry, or eviction can lose pending evidence; such a response is skipped.
-Cancelled or failed replies are not audited.
-
-Only successful affirmative issue judgments produce feedback.
-Timeouts, missing credentials, capacity exhaustion, abstentions and failed checks produce no finding.
-Other successful checks can still contribute findings, provided the total hook deadline has not expired.
-Feedback is routed through MindRoom's existing authorization and dispatch rules, preserving the original requester.
-The message includes `com.mindroom.response_audit` metadata identifying the audited response event and failed check IDs.
-
-A local SQLite ledger stores only agent, room and response-event identifiers under the plugin's MindRoom state directory.
-It claims an audit before inference, ensuring **at most one attempt per response**, including replay and restart.
-Delivery is best effort: a crash, timeout, or send failure can lose a correction, and the plugin does not retry it.
-The ledger is retained until its state directory is removed; it stores no message bodies or tool results.
-
-## Development
-
-This is a directory plugin, matching other repositories in the MindRoom organization; no separate package installation is required.
-With a sibling MindRoom checkout and its development dependencies installed:
+Update to the latest commit later with:
 
 ```bash
-uv run --project ../mindroom pytest tests
-uv run --project ../mindroom mindroom plugins check .
-uv run --project ../mindroom pre-commit run --all-files
+mindroom plugins update response-audit-jev-plugin
 ```
 
-On NixOS, run these inside the MindRoom `shell.nix` environment.
-CI uses MindRoom's reusable plugin compatibility workflow pinned to `v2026.9.232`.
-Tests exercise real hook contexts and mock the provider/network boundary; they do not establish live judgment accuracy or a calibrated threshold.
+The command pins the exact installed commit in `.mindroom-plugin.lock.json` and strictly validates the plugin before activating it.
+For a manual checkout, clone this repository into your `plugins/` directory.
+
+## Setup
+
+1. Set `TYPESAFE_API_KEY` in the MindRoom instance environment or config-adjacent `.env`.
+2. Add the plugin to `config.yaml` and select the agents to audit:
+
+   ```yaml
+   plugins:
+     - path: plugins/response-audit-jev-plugin
+       settings:
+         agents: [research]
+         source_tools: [search_data]  # Replace with your actual tool function names
+         judgment:
+           provider: typesafe
+           threshold: 0.9
+           timeout_seconds: 1.5
+   ```
+
+3. Restart MindRoom or let its normal config reload apply the change.
+
+No agent tools are required.
+`agents` defaults to `[]`, so installation alone audits nobody.
+Settings follow selected agents across authorized rooms; teams are excluded.
+`source_tools` names the actual search, database, or document-retrieval functions observed by tool hooks.
+Without it, only the citation check runs by default.
+The probability threshold is a starting point, not a calibrated accuracy guarantee.
+
+See [Configuration and Custom Checks](docs/configuration.md) for all settings, LLM configuration, custom questions, and development commands.
