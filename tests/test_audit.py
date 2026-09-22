@@ -317,6 +317,8 @@ async def test_backend_exception_and_cancellation_never_post(turn):
     await hooks.begin_audit(start)
     await hooks.audit_response(end)
     end.message_sender.assert_not_awaited()
+    assert all(call.kwargs["error_type"] == "RuntimeError" for call in end.logger.warning.call_args_list)
+    assert "private provider error" not in str(end.logger.warning.call_args_list)
     end.result = replace(end.result, response_event_id="$answer2")
     factory.return_value = AsyncMock(side_effect=asyncio.CancelledError)
     await hooks.begin_audit(start)
