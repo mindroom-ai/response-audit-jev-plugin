@@ -346,7 +346,6 @@ async def test_real_typesafe_adapter_uses_audit_questions_and_probability(turn, 
     """Exercise the shared backend contract without a real network request."""
     import httpx
     from mindroom.judgment import evaluator
-    from mindroom.judgment.client import PINNED_MODEL, SystemOneClient
 
     start, end, _, _ = turn
     wire_requests = []
@@ -359,14 +358,15 @@ async def test_real_typesafe_adapter_uses_audit_questions_and_probability(turn, 
         return httpx.Response(
             200,
             json={
-                "model": PINNED_MODEL,
+                "model": payload["model"],
                 "answers": {check_id: {"type": "noul", "noul": 0.97 if check_id == "citations" else 0.1}},
                 "usage": {"input_tokens": 100, "output_tokens": 10},
             },
         )
 
     transport = httpx.MockTransport(respond)
-    monkeypatch.setattr(evaluator, "SystemOneClient", lambda **kwargs: SystemOneClient(**kwargs, transport=transport))
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(**{**kwargs, "transport": transport}))
     monkeypatch.setattr(hooks, "create_judgment_evaluator", evaluator.create_judgment_evaluator)
     paths = replace(start.runtime_paths, process_env={"TYPESAFE_API_KEY": "synthetic-key"})
     start.runtime_paths = end.runtime_paths = paths
