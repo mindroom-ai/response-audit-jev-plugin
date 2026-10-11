@@ -122,7 +122,7 @@ async def audit_response(ctx: AfterResponseContext) -> None:
     )
     evidence = evidence_text(envelope.body, ctx.result.response_text, capture.tools, shared_files)
     requests = [(check, request_for(check, evidence)) for check in settings.checks]
-    if not requests or any(not request.complete for _, request in requests):
+    if any(not request.complete for _, request in requests):
         ctx.logger.info("response_audit_skipped", reason="incomplete_evidence")
         return
     if not await asyncio.to_thread(
