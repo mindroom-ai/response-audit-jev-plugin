@@ -44,6 +44,7 @@ plugins:
 | `checks[].feedback` | string | Required | Correction guidance, 1–500 characters |
 
 Unknown settings are rejected when hooks validate their configuration.
+When upgrading from a version with the `citations` and `source_use` checks, remove `source_tools` and any `requires_source_tools` from the plugin settings, or every audit fails validation.
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
 To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
@@ -65,7 +66,8 @@ The after-response hook has a 30-second total timeout; each backend call also ha
 ## Evidence and Limits
 
 The judge receives the inbound request, the final delivered answer, the names of files and images shared in the conversation, and observed tool names, statuses, arguments, and results **from that agent's current turn**.
-Shared files reach the model without a tool call, so facts from them count as supplied by the person; voice-message audio is already transcribed into the request and is not listed.
+Shared files reach the model without a tool call, so facts from them count as supplied by the person; voice-message audio is not listed because its transcript is the request.
+When voice transcription is off or fails, the agent hears the raw audio while the judge sees only a placeholder request, so facts the person spoke can draw a follow-up.
 These contents are sent to the configured external judgment provider.
 No system prompt, memory, or complete conversation history is added.
 Credentials detected by MindRoom's redaction rules cause the entire audit to be skipped, rather than sending an altered evidence set.
