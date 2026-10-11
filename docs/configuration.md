@@ -48,7 +48,7 @@ When upgrading from a version with the `citations` and `source_use` checks, remo
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
 To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions, timeout_seconds: 5}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
-The evaluation used a 5-second or longer timeout: answers usually take well under a second, but slow periods exceed the 1.5-second default, and a timeout produces no finding.
+The evaluation used a 5-second or longer timeout: slow periods exceed the 1.5-second default, and a timeout produces no finding.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
 ```yaml
