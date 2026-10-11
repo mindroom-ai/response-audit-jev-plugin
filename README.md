@@ -91,7 +91,7 @@ For a manual checkout, clone this repository into your `plugins/` directory.
 No agent tools are required.
 `agents` defaults to `[]`, so installation alone audits nobody.
 Settings follow selected agents across authorized rooms; teams are excluded.
-To use the OpenAI Decisions API instead of JEV, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key.
+To use the OpenAI Decisions API instead of JEV, set `judgment: {provider: openai_decisions, timeout_seconds: 5}`; it uses the instance's OpenAI API key.
 The probability threshold is a starting point, not a calibrated accuracy guarantee.
 
 See [Configuration and Custom Checks](docs/configuration.md) for all settings, LLM configuration, custom questions, and development commands.

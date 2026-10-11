@@ -47,7 +47,8 @@ Unknown settings are rejected when hooks validate their configuration.
 When upgrading from a version with the `citations` and `source_use` checks, remove `source_tools` and any `requires_source_tools` from the plugin settings, or every audit fails validation.
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
-To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
+To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions, timeout_seconds: 5}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
+The evaluation used a 5-second or longer timeout: answers usually take well under a second, but slow periods exceed the 1.5-second default, and a timeout produces no finding.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
 ```yaml
@@ -90,7 +91,7 @@ Only successful affirmative issue judgments produce feedback.
 Timeouts, missing credentials, capacity exhaustion, abstentions and failed checks produce no finding.
 Other successful checks can still contribute findings, provided the total hook deadline has not expired.
 Feedback is routed through MindRoom's existing authorization and dispatch rules, preserving the original requester.
-The message quotes the start of the audited answer, so the agent corrects that answer even when newer replies follow it, and includes `com.mindroom.response_audit` metadata identifying the audited response event and failed check IDs.
+The message quotes the start of the audited answer, which names that answer even when newer replies follow it, and includes `com.mindroom.response_audit` metadata identifying the audited response event and failed check IDs.
 
 A local SQLite ledger stores only agent, room and response-event identifiers under the plugin's MindRoom state directory.
 It claims an audit before inference, ensuring **at most one attempt per response**, including replay and restart.
@@ -107,9 +108,9 @@ A reply counts as handled correctly when it gets a follow-up exactly when it sta
 | Previous defaults (`citations`, plus `source_use`), skipping attachments | 13 of 38 wrong | 17 of 114 wrong | 25 of 114 wrong |
 | `research` | 2 of 38 wrong | 5 of 114 wrong | 2 of 114 wrong |
 
-The previous checks missed most unresearched recommendations and flagged replies whose searches supported them, because `citations` asks for citations in the answer rather than lookups.
+On OpenAI Decisions the previous checks missed most unresearched recommendations; on all backends they flagged replies whose searches supported them, because `citations` asks for citations in the answer rather than lookups.
 Borderline replies, such as an opinion added to a supported answer, can move across the threshold with small wording changes, so treat their outcome as uncertain.
-With a newer reply between the audited answer and the follow-up, a tool-free probe asked each model which claims it would check: with the audited answer quoted, gpt-6-luna and gpt-6.1-sol picked claims from that answer 12 of 12 times, against 0 of 12 with the previous wording.
+With a newer reply between the audited answer and the follow-up, a tool-free probe asked each model which claims it would check: with the previous wording, gpt-6-luna and gpt-6.1-sol listed claims from both answers 12 of 12 times; with the audited answer quoted, they listed only that answer's claims 12 of 12 times.
 TypeSafe JEV was not measured because no key was available.
 
 ## Development
