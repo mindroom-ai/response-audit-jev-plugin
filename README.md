@@ -51,6 +51,7 @@ See [Evidence and Limits](docs/configuration.md#evidence-and-limits) for context
 ## Requirements
 
 MindRoom **v2026.9.232 or newer**, Python 3.13 or newer, and a `TYPESAFE_API_KEY` for JEV.
+The OpenAI Decisions backend needs MindRoom **v2026.10.205 or newer**.
 An LLM judge uses the configured model alias's normal credentials instead.
 
 ## Install
@@ -91,7 +92,7 @@ For a manual checkout, clone this repository into your `plugins/` directory.
 No agent tools are required.
 `agents` defaults to `[]`, so installation alone audits nobody.
 Settings follow selected agents across authorized rooms; teams are excluded.
-To use the OpenAI Decisions API instead of JEV, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key.
+To use the OpenAI Decisions API instead of JEV, set `judgment: {provider: openai_decisions}` (MindRoom v2026.10.205 or newer); it uses the instance's OpenAI API key.
 The probability threshold is a starting point, not a calibrated accuracy guarantee.
 
 See [Configuration and Custom Checks](docs/configuration.md) for all settings, LLM configuration, custom questions, and development commands.
