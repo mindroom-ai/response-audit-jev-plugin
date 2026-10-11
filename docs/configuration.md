@@ -78,10 +78,9 @@ Only enable this plugin where that data transfer is appropriate.
 The plugin watches `message:enrich`, `tool:after_call`, `message:after_response`, and `message:cancelled`.
 It uses public hooks and adds no new core hook or agent tool.
 It does not browse citations itself and cannot prove factual correctness.
-Earlier conversation sources, provider-native tools, delegated work, and tool activity outside the observed turn are not fully visible.
 The judge sees only the audited message, the names of shared files, and this turn's tool calls, so facts from earlier messages or lookups in the thread, the agent's instructions, context files, or memory, provider-native tools, or delegated work can draw a follow-up, and a fact added beside a shared file can be credited to that file.
 
-Audits are skipped for missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, non-AI/empty responses, and turns no person asked for, such as schedules, webhooks, and messages from agents or plugins.
+Audits are skipped for missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, non-AI/empty responses, and turns no person asked for, such as messages from agents or plugins, and schedules and webhooks that mention the agent; a schedule the router hands to an agent is audited like the creator's request.
 Evidence is never silently truncated: at most 32 tool observations and a 16 KB shared judgment request.
 Only 128 pending turn captures are kept in memory, expiring after one hour.
 Restart, hot reload, expiry, or eviction can lose pending evidence; such a response is skipped.

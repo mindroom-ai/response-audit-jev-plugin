@@ -38,7 +38,8 @@ _OPENING_CHARS = 80
 
 
 def _eligible(envelope: MessageEnvelope, settings: AuditSettings) -> bool:
-    # A person's own request only: never correction turns, other agents, automations, schedules, or webhooks.
+    # A person's own request only: never correction turns, other agents, automations, or schedules and webhooks
+    # that mention the agent; MindRoom treats a schedule the router hands to an agent as the creator's request.
     return (
         envelope.agent_name in settings.agents
         and envelope.origin.may_answer_interactive_prompt
