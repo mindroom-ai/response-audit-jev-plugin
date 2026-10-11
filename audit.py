@@ -12,51 +12,47 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 Name = Annotated[str, Field(min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")]
 
 
+GENERIC_WHEN_TRUE = "A clear, actionable violation is supported by the provided evidence."
+GENERIC_WHEN_FALSE = "No clear violation, not applicable, or insufficient evidence."
+
+
 class AuditCheck(BaseModel):
-    """One issue question and the fixed feedback sent on a positive finding."""
+    """One issue question, optional criteria for each answer, and the fixed feedback sent on a positive finding."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     id: Name
     instructions: str = Field(min_length=1, max_length=2000)
+    when_true: str = Field(default=GENERIC_WHEN_TRUE, min_length=1, max_length=2000)
+    when_false: str = Field(default=GENERIC_WHEN_FALSE, min_length=1, max_length=2000)
     feedback: str = Field(min_length=1, max_length=500)
-    requires_source_tools: bool = False
 
 
+# Chosen by labeled replies on OpenAI Decisions, gpt-6-luna, and gpt-6.1-sol; see docs/configuration.md.
 DEFAULT_CHECKS = (
     AuditCheck(
-        id="citations",
+        id="research",
         instructions=(
-            "Does this response clearly omit necessary citations, or cite sources contradicted by "
-            "the supplied tool evidence? "
-            "Require citations for externally verifiable figures, research findings, current "
-            "facts, or explicit citation requests. "
-            "Do not flag ordinary conversation, code-only help, creative writing, or clearly labeled speculation. "
-            "A citation's presence does not prove correctness. Unavailable source content cannot "
-            "establish a citation is false."
+            "Does the response need a follow-up that verifies it? "
+            "The tools field lists every tool call recorded for this response."
+        ),
+        when_true=(
+            "The response states checkable facts a person would act on about specific real-world things, such as "
+            "places, businesses, products, events, companies, documents, laws, or studies, for example that they "
+            "exist, where they are, when they are open or happening, what they cost, whether they are available, "
+            "what they say, or what figures they report, and the recorded tool calls did not look those facts up or "
+            "their results do not support them."
+        ),
+        when_false=(
+            "The response makes no such factual claims, the recorded tool results support them, the person supplied "
+            "them, directly or in files listed in shared_files (the assistant reads those files without tool calls), "
+            "or named the thing themselves and the response only gives general advice about it, they are stable "
+            "common knowledge, or the only unsupported parts are opinions, descriptions of quality, general "
+            "suggestions, or pointers to where the information can be found."
         ),
         feedback=(
-            "Review the citations: add sources for factual claims that need them and "
-            "correct any unsupported attribution."
-        ),
-    ),
-    AuditCheck(
-        id="source_use",
-        requires_source_tools=True,
-        instructions=(
-            "Did the agent clearly fail to consult a required data source during this turn, or "
-            "claim a successful lookup "
-            "contradicted by the recorded tool activity? The configured source_tools identify data-access functions. "
-            "Count only successful relevant calls, not failed or blocked calls. Other tools may "
-            "also obtain data; inspect their evidence. "
-            "A lookup is required when the request asks for fresh verification or source "
-            "consultation, not for every factual answer. "
-            "Do not infer a failure merely from no calls: user-provided data, earlier context, "
-            "provider-native tools and delegated "
-            "work are not fully observable. Report only a clear violation supported by this turn's evidence."
-        ),
-        feedback=(
-            "Check the required data source before answering; distinguish successful "
-            "lookups from failed or unverified ones."
+            "Verify the specific facts with your tools, such as search, browsing, or documents you can read; correct "
+            "or withdraw anything that does not hold up, name the sources you checked, and say which facts remain "
+            "unverified."
         ),
     ),
 )
@@ -67,7 +63,6 @@ class AuditSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     agents: list[Name] = Field(default_factory=list, max_length=100)
-    source_tools: list[Name] = Field(default_factory=list, max_length=100)
     judgment: JudgmentConfig = Field(default_factory=lambda: TypeSafeJudgmentConfig(provider="typesafe", threshold=0.9))
     checks: tuple[AuditCheck, ...] = Field(default=DEFAULT_CHECKS, min_length=1, max_length=8)
 
@@ -85,8 +80,8 @@ def request_for(check: AuditCheck, evidence: str) -> JudgmentRequest:
         JudgmentQuestion(
             id=check.id,
             instructions=check.instructions,
-            when_true="A clear, actionable violation is supported by the provided evidence.",
-            when_false="No clear violation, not applicable, or insufficient evidence.",
+            when_true=check.when_true,
+            when_false=check.when_false,
         ),
         (JudgmentMessage("user", evidence),),
         instructions=(
@@ -99,10 +94,13 @@ def request_for(check: AuditCheck, evidence: str) -> JudgmentRequest:
     )
 
 
-def evidence_text(request: str, response: str, tools: list[dict[str, object]], source_tools: list[str]) -> str:
+def evidence_text(request: str, response: str, tools: list[dict[str, object]], shared_files: list[str]) -> str:
     """Serialize the exact bounded evidence shared by every configured check."""
+    evidence: dict[str, object] = {"request": request, "response": response, "tools": tools}
+    if shared_files:
+        evidence["shared_files"] = shared_files
     return json.dumps(
-        {"request": request, "response": response, "tools": tools, "source_tools": source_tools},
+        evidence,
         ensure_ascii=False,
         allow_nan=False,
         separators=(",", ":"),

@@ -2,15 +2,13 @@
 
 [Back to README](../README.md)
 
-## Default Checks
+## Default Check
 
 | Check | What it flags |
 | --- | --- |
-| `citations` | Clearly missing required citations or attribution contradicted by the supplied tool evidence |
-| `source_use` | Clearly missing required source consultation or lookup claims contradicted by observed tool activity |
+| `research` | Checkable facts a person would act on, such as what a place, company, document, law, or study is, says, costs, or reports, that the recorded tool calls did not look up or do not support |
 
-The source-use check runs only when `source_tools` is nonempty.
-The rubrics distinguish fresh verification from ordinary conversation, creative work, code-only answers, and answers based on data supplied by the user.
+Facts the person supplied, directly or in shared files, general advice about something the person named, stable common knowledge, opinions, and pointers to where information can be found do not count.
 A successful tool call is evidence that a function returned, not proof that every claim in its result is correct.
 The judge also inspects the result and relevance to the request.
 
@@ -18,6 +16,7 @@ The judge also inspects the result and relevance to the request.
 
 Providing `checks` **replaces** the defaults.
 Each check asks whether a specific actionable problem is present; a positive judgment triggers its fixed `feedback` text.
+Without `when_true` and `when_false`, the judge answers whether a clear, actionable violation is supported by the evidence.
 The judge does not generate correction prose.
 
 ```yaml
@@ -36,17 +35,18 @@ plugins:
 | Setting | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `agents` | list of names | `[]` | Agents enabled for audits; maximum 100 |
-| `source_tools` | list of function names | `[]` | Known source-access functions; maximum 100 |
 | `judgment` | object | TypeSafe, threshold `0.9`, timeout `1.5` seconds | Existing MindRoom judgment configuration |
-| `checks` | list | Citation and source-use checks | Between 1 and 8 checks, with unique IDs |
+| `checks` | list | The `research` check | Between 1 and 8 checks, with unique IDs |
 | `checks[].id` | string | Required | Check identifier, 1–100 letters, digits, underscores or hyphens |
 | `checks[].instructions` | string | Required | Violation question, 1–2,000 characters |
+| `checks[].when_true` | string | A clear, actionable violation is supported by the evidence | When the judge should answer yes, 1–2,000 characters |
+| `checks[].when_false` | string | No clear violation, not applicable, or insufficient evidence | When the judge should answer no, 1–2,000 characters |
 | `checks[].feedback` | string | Required | Correction guidance, 1–500 characters |
-| `checks[].requires_source_tools` | boolean | `false` | Skip this check unless source function names are configured |
 
 Unknown settings are rejected when hooks validate their configuration.
-Agent and source function names accept 1–100 letters, digits, underscores or hyphens.
+Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
+To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
 ```yaml
@@ -58,13 +58,14 @@ judgment:
 
 Each configured check makes one sequential judgment call.
 There is no automatic backend fallback or application-level retry.
-LLM judgments return booleans; the probability threshold applies only to TypeSafe.
+LLM judgments return booleans; the probability threshold applies to TypeSafe and OpenAI Decisions.
 Both backends reuse MindRoom's shared per-agent and process capacity limits.
 The after-response hook has a 30-second total timeout; each backend call also has its configured deadline.
 
 ## Evidence and Limits
 
-The judge receives the inbound request, the final delivered answer, configured source tool names, and observed tool names, statuses, arguments, and results **from that agent's current turn**.
+The judge receives the inbound request, the final delivered answer, the names of files and images shared in the conversation, and observed tool names, statuses, arguments, and results **from that agent's current turn**.
+Shared files reach the model without a tool call, so facts from them count as supplied by the person; voice-message audio is already transcribed into the request and is not listed.
 These contents are sent to the configured external judgment provider.
 No system prompt, memory, or complete conversation history is added.
 Credentials detected by MindRoom's redaction rules cause the entire audit to be skipped, rather than sending an altered evidence set.
@@ -77,7 +78,7 @@ It does not browse citations itself and cannot prove factual correctness.
 Earlier conversation sources, provider-native tools, delegated work, and tool activity outside the observed turn are not fully visible.
 The rubrics treat these limitations as uncertainty, not automatic failure.
 
-Audits are skipped for attachments, missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, and non-AI/empty responses.
+Audits are skipped for missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, non-AI/empty responses, and turns no person asked for, such as schedules, webhooks, and messages from agents or plugins.
 Evidence is never silently truncated: at most 32 tool observations and a 16 KB shared judgment request.
 Only 128 pending turn captures are kept in memory, expiring after one hour.
 Restart, hot reload, expiry, or eviction can lose pending evidence; such a response is skipped.
@@ -87,12 +88,27 @@ Only successful affirmative issue judgments produce feedback.
 Timeouts, missing credentials, capacity exhaustion, abstentions and failed checks produce no finding.
 Other successful checks can still contribute findings, provided the total hook deadline has not expired.
 Feedback is routed through MindRoom's existing authorization and dispatch rules, preserving the original requester.
-The message includes `com.mindroom.response_audit` metadata identifying the audited response event and failed check IDs.
+The message quotes the start of the audited answer, so the agent corrects that answer even when newer replies follow it, and includes `com.mindroom.response_audit` metadata identifying the audited response event and failed check IDs.
 
 A local SQLite ledger stores only agent, room and response-event identifiers under the plugin's MindRoom state directory.
 It claims an audit before inference, ensuring **at most one attempt per response**, including replay and restart.
 Delivery is best effort: a crash, timeout, or send failure can lose a correction, and the plugin does not retry it.
 The ledger is retained until its state directory is removed; it stores no message bodies or tool results.
+
+## Evaluation
+
+The default check was chosen on 38 labeled replies: unresearched recommendations and corporate claims, replies backed by searches, page reads, or shared files, and replies with no factual claims.
+A reply counts as handled correctly when it gets a follow-up exactly when it states facts no lookup or shared file supports.
+
+| Checks | OpenAI Decisions (threshold 0.8) | gpt-6-luna, 3 runs | gpt-6.1-sol, 3 runs |
+| --- | --- | --- | --- |
+| Previous defaults (`citations`, plus `source_use`), skipping attachments | 13 of 38 wrong | 12 to 16 of 114 wrong | 24 of 114 wrong |
+| `research` | 2 of 38 wrong | 3 of 114 wrong | 1 of 114 wrong |
+
+The previous checks missed most unresearched recommendations and flagged replies whose searches supported them, because `citations` asks for citations in the answer rather than lookups.
+Borderline replies, such as an opinion added to a supported answer, can move across the threshold with small wording changes, so treat their outcome as uncertain.
+With a newer reply between the audited answer and the follow-up, quoting the audited answer made gpt-6-luna and gpt-6.1-sol verify the right answer 12 of 12 times, against 0 of 12 with the previous wording.
+TypeSafe JEV was not measured because no key was available.
 
 ## Development
 

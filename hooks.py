@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
+from mindroom.attachments import resolve_attachments
 from mindroom.hooks import (
     AfterResponseContext,
     CancelledResponseContext,
     MessageEnrichContext,
     MessageEnvelope,
-    SenderKind,
     ToolAfterCallContext,
     hook,
 )
 from mindroom.judgment.evaluator import create_judgment_evaluator
+from mindroom.tool_system.events import is_visible_tool_marker_line
 
 from .audit import AuditSettings, evidence_text, request_for
 from .state import Capture, CaptureKey, captures, claim_attempt, prune
@@ -31,15 +33,30 @@ def _message_key(
     )
 
 
+# Enough of the audited reply to name it when newer replies follow it in the thread.
+_OPENING_CHARS = 80
+
+
 def _eligible(envelope: MessageEnvelope, settings: AuditSettings) -> bool:
+    # A person's own request only: never correction turns, other agents, automations, schedules, or webhooks.
     return (
         envelope.agent_name in settings.agents
-        and not envelope.hook_source
-        and envelope.message_received_depth == 0
-        and envelope.origin.requester_kind == SenderKind.USER
-        and not envelope.attachment_ids
+        and envelope.origin.may_answer_interactive_prompt
         and bool(envelope.body.strip())
     )
+
+
+def _shared_file_names(storage_root: Path, attachment_ids: tuple[str, ...]) -> list[str]:
+    # The model reads shared files without tool calls; voice audio is already transcribed into the request.
+    records = resolve_attachments(storage_root, list(attachment_ids))
+    return [record.filename or record.kind for record in records if record.kind != "audio"]
+
+
+def _reply_opening(response: str) -> str:
+    # Without "@", a mention in the quote cannot tag another agent or person in the follow-up.
+    text = " ".join(line for line in response.splitlines() if not is_visible_tool_marker_line(line))
+    text = " ".join(text.replace("@", "").split())
+    return text if len(text) <= _OPENING_CHARS else f"{text[:_OPENING_CHARS]}…"
 
 
 @hook("message:enrich", name="begin-response-audit", timeout_ms=1000)
@@ -93,9 +110,13 @@ async def audit_response(ctx: AfterResponseContext) -> None:
         or not ctx.is_active()
     ):
         return
-    evidence = evidence_text(envelope.body, ctx.result.response_text, capture.tools, settings.source_tools)
-    checks = [check for check in settings.checks if not check.requires_source_tools or settings.source_tools]
-    requests = [(check, request_for(check, evidence)) for check in checks]
+    shared_files = (
+        await asyncio.to_thread(_shared_file_names, ctx.runtime_paths.storage_root, envelope.attachment_ids)
+        if envelope.attachment_ids
+        else []
+    )
+    evidence = evidence_text(envelope.body, ctx.result.response_text, capture.tools, shared_files)
+    requests = [(check, request_for(check, evidence)) for check in settings.checks]
     if not requests or any(not request.complete for _, request in requests):
         ctx.logger.info("response_audit_skipped", reason="incomplete_evidence")
         return
@@ -124,10 +145,13 @@ async def audit_response(ctx: AfterResponseContext) -> None:
             findings.append(check)
     if not findings or not ctx.is_active():
         return
+    # Naming the audited reply in the closing request keeps agents from correcting a newer reply instead.
+    opening = _reply_opening(ctx.result.response_text)
     text = (
         f"@{envelope.agent_name} — response audit flagged the following for review:\n"
         + "\n".join(f"- {check.id}: {check.feedback}" for check in findings)
-        + "\nPlease verify these findings and correct your previous answer where needed."
+        + f'\nPlease verify these findings in your reply that starts "{opening}" and correct that reply where needed; '
+        "later replies are not part of this audit."
     )
     await ctx.send_message(
         envelope.room_id,
