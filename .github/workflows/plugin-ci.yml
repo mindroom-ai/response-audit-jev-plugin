@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   compatibility:
-    uses: mindroom-ai/mindroom/.github/workflows/plugin-ci.yml@v2026.9.232
+    uses: mindroom-ai/mindroom/.github/workflows/plugin-ci.yml@v2026.10.205
     with:
       plugin_repository: ${{ github.repository }}
       plugin_ref: ${{ github.sha }}

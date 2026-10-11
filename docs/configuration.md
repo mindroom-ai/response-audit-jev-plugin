@@ -46,7 +46,7 @@ plugins:
 Unknown settings are rejected when hooks validate their configuration.
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
-To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}` (MindRoom v2026.10.205 or newer); it uses the instance's OpenAI API key, and its default threshold is `0.8`.
+To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
 ```yaml
@@ -59,7 +59,7 @@ judgment:
 Each configured check makes one sequential judgment call.
 There is no automatic backend fallback or application-level retry.
 LLM judgments return booleans; the probability threshold applies to TypeSafe and OpenAI Decisions.
-Both backends reuse MindRoom's shared per-agent and process capacity limits.
+All backends reuse MindRoom's shared per-agent and process capacity limits.
 The after-response hook has a 30-second total timeout; each backend call also has its configured deadline.
 
 ## Evidence and Limits
@@ -76,7 +76,7 @@ The plugin watches `message:enrich`, `tool:after_call`, `message:after_response`
 It uses public hooks and adds no new core hook or agent tool.
 It does not browse citations itself and cannot prove factual correctness.
 Earlier conversation sources, provider-native tools, delegated work, and tool activity outside the observed turn are not fully visible.
-The rubrics treat these limitations as uncertainty, not automatic failure.
+The `research` check sees only this turn's tool calls, so an answer that repeats facts looked up earlier in the thread, by provider-native tools, or by delegated work can still get a follow-up.
 
 Audits are skipped for missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, non-AI/empty responses, and turns no person asked for, such as schedules, webhooks, and messages from agents or plugins.
 Evidence is never silently truncated: at most 32 tool observations and a 16 KB shared judgment request.
@@ -122,5 +122,5 @@ uv run --project ../mindroom pre-commit run --all-files
 ```
 
 On NixOS, run these inside the MindRoom `shell.nix` environment.
-CI uses MindRoom's reusable plugin compatibility workflow pinned to `v2026.9.232`.
+CI uses MindRoom's reusable plugin compatibility workflow pinned to `v2026.10.205`.
 Tests exercise real hook contexts and mock the provider/network boundary; they do not establish live judgment accuracy or a calibrated threshold.

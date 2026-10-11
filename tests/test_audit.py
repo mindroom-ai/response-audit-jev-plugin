@@ -172,7 +172,7 @@ async def test_ineligible_responses_do_not_judge_or_send(turn, reason):
             reason, TurnIntent.EXTERNAL_TRIGGER
         )
         origin = replace(start.envelope.origin, intent=intent, source_kind=reason)
-        start.envelope = replace(start.envelope, origin=origin, hook_source="response-audit-jev:message:after_response")
+        start.envelope = replace(start.envelope, origin=origin)
     end.result = replace(end.result, envelope=start.envelope)
     if reason == "non_ai":
         end.result = replace(end.result, response_kind="command")
