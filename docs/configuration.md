@@ -108,7 +108,7 @@ A reply counts as handled correctly when it gets a follow-up exactly when it sta
 | Previous defaults (`citations`, plus `source_use`), skipping attachments | 13 of 38 wrong | 17 of 114 wrong | 25 of 114 wrong |
 | `research` | 2 of 38 wrong | 5 of 114 wrong | 2 of 114 wrong |
 
-On OpenAI Decisions the previous checks missed most unresearched recommendations; on all backends they flagged replies whose searches supported them, because `citations` asks for citations in the answer rather than lookups.
+On OpenAI Decisions the previous checks missed most unresearched recommendations; on every measured backend they flagged replies whose searches supported them, because `citations` asks for citations in the answer rather than lookups.
 Borderline replies, such as an opinion added to a supported answer, can move across the threshold with small wording changes, so treat their outcome as uncertain.
 With a newer reply between the audited answer and the follow-up, a tool-free probe asked each model which claims it would check: with the previous wording, gpt-6-luna and gpt-6.1-sol listed claims from both answers 12 of 12 times; with the audited answer quoted, they listed only that answer's claims 12 of 12 times.
 TypeSafe JEV was not measured because no key was available.
