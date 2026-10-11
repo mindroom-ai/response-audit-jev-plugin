@@ -45,14 +45,14 @@ plugins:
 
 Unknown settings are rejected when hooks validate their configuration.
 When upgrading from a version with the `citations` and `source_use` checks, remove `source_tools` and any `requires_source_tools` from the plugin settings, or every audit fails validation.
-When upgrading from `response-audit-jev-plugin`, install `response-audit-plugin` and update the `path:` in `config.yaml`; the plugin's state moves to `plugins/response-audit/`, its at-most-once ledger starts empty, and the old `plugins/response-audit-jev/` directory can be deleted.
-Versions before the rename defaulted to TypeSafe JEV; set `judgment: {provider: typesafe, threshold: 0.9}` to keep it.
+When upgrading from `response-audit-jev-plugin`, install `response-audit-plugin` and update the `path:` in `config.yaml`; the old checkout and the old state directory, `mindroom_data/plugins/response-audit-jev/`, can be deleted, since the plugin now keeps its state in `mindroom_data/plugins/response-audit/`.
+Versions before the rename defaulted to TypeSafe JEV; use the TypeSafe setting below to keep it.
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
 The default OpenAI Decisions backend uses the instance's OpenAI API key, from `OPENAI_API_KEY` or the dashboard.
-Its 5-second timeout matches the evaluation: slow periods exceed MindRoom's 1.5-second judgment default, and a timeout produces no finding.
+Its 5-second timeout is the shortest the evaluation used: slow periods exceed MindRoom's 1.5-second judgment default, and a timeout produces no finding.
 A `judgment` setting replaces the whole default, so keep `timeout_seconds: 5` when changing OpenAI Decisions fields such as `threshold` or `credentials_service`.
-Instances whose OpenAI credential is a proxy key need `credentials_service` pointing at a real OpenAI key, as the judgment configuration docs describe.
+Instances whose OpenAI credential is a proxy key need `credentials_service` (MindRoom v2026.10.222 or newer) pointing at a real OpenAI key, as the judgment configuration docs describe.
 To use TypeSafe JEV, set `judgment: {provider: typesafe, threshold: 0.9}` and provide a `TYPESAFE_API_KEY`.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
