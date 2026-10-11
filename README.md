@@ -87,8 +87,6 @@ For a manual checkout, clone this repository into your `plugins/` directory.
 No agent tools are required.
 `agents` defaults to `[]`, so installation alone audits nobody.
 Settings follow selected agents across authorized rooms; teams are excluded.
-The default judgment is `{provider: openai_decisions, threshold: 0.8, timeout_seconds: 5}`, the configuration the evaluation measured.
-To use TypeSafe JEV instead, set `judgment: {provider: typesafe, threshold: 0.9}`; it was not measured.
 The probability threshold is a starting point, not a calibrated accuracy guarantee.
 
 See [Configuration and Custom Checks](docs/configuration.md) for all settings, LLM configuration, custom questions, and development commands.
