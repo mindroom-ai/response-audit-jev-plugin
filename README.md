@@ -12,14 +12,14 @@
 A [MindRoom](https://github.com/mindroom-ai/mindroom) hook plugin that uses [TypeSafe JEV](https://docs.typesafe.ai/api) to check completed answers and ask the responding agent to correct likely problems.
 
 The agent answers first.
-The plugin checks its citations and source use against the request and recorded tool activity, then posts one follow-up in the same thread, tagging the agent with specific correction guidance.
+The plugin checks whether the answer states facts that no recorded lookup supported, then posts one follow-up in the same thread, tagging the agent with specific correction guidance.
 Checks are configurable, so the same mechanism can review units, formatting, or other requirements.
 
 ## Features
 
 - Audits selected agents after their answers are delivered
-- Includes citation and source-use checks, with support for custom questions
-- Uses JEV by default or an existing MindRoom LLM model alias
+- Includes a research check chosen by labeled replies on real models, with support for custom questions
+- Uses JEV by default, or the OpenAI Decisions API or an existing MindRoom LLM model alias
 - Checks recorded tool activity instead of treating the agent's lookup claims as evidence
 - Combines findings into one same-thread follow-up that mentions the agent
 - Skips hook-generated correction turns to prevent audit loops
@@ -30,8 +30,8 @@ Checks are configurable, so the same mechanism can review units, formatting, or 
 
 1. An enabled agent receives a user request, and the plugin begins observing that turn.
 2. Tool hooks record completed calls, including arguments, results, and success/failure status.
-3. After the answer is delivered, JEV evaluates the request, answer, and tool evidence against each check.
-4. If checks flag a clear issue, the plugin posts one message mentioning the agent with their configured correction guidance.
+3. After the answer is delivered, the judge evaluates the request, answer, tool evidence, and the names of files shared in the conversation against each check.
+4. If checks flag a clear issue, the plugin posts one message mentioning the agent with their configured correction guidance and quoting the start of the audited answer.
 5. The agent handles that follow-up through MindRoom's normal permissions and dispatch flow.
 
 The audit requests verification; it does not prove an answer wrong.
@@ -80,7 +80,6 @@ For a manual checkout, clone this repository into your `plugins/` directory.
      - path: plugins/response-audit-jev-plugin
        settings:
          agents: [research]
-         source_tools: [search_data]  # Replace with your actual tool function names
          judgment:
            provider: typesafe
            threshold: 0.9
@@ -92,8 +91,7 @@ For a manual checkout, clone this repository into your `plugins/` directory.
 No agent tools are required.
 `agents` defaults to `[]`, so installation alone audits nobody.
 Settings follow selected agents across authorized rooms; teams are excluded.
-`source_tools` names the actual search, database, or document-retrieval functions observed by tool hooks.
-Without it, only the citation check runs by default.
+To use the OpenAI Decisions API instead of JEV, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key.
 The probability threshold is a starting point, not a calibrated accuracy guarantee.
 
 See [Configuration and Custom Checks](docs/configuration.md) for all settings, LLM configuration, custom questions, and development commands.

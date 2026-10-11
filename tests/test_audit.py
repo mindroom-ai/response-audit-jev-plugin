@@ -43,7 +43,7 @@ spec.loader.exec_module(hooks)
 @pytest.fixture
 def turn(tmp_path, monkeypatch):
     registry = HookRegistry.empty()
-    settings = {"agents": ["research"], "source_tools": ["search_data"]}
+    settings = {"agents": ["research"]}
     origin = TurnOrigin(
         transport_sender_id="@human:example.org",
         requester_id="@human:example.org",
@@ -130,18 +130,24 @@ async def test_records_evidence_and_posts_one_combined_same_thread_followup(turn
     await hooks.begin_audit(start)
     await hooks.record_tool(tool(start))
     await hooks.audit_response(end)
-    assert len(calls) == 2
+    assert len(calls) == 1
+    assert calls[0]["question"]["id"] == "research"
+    assert calls[0]["question"]["criteria"]["true"].startswith("The response states checkable facts")
     evidence = json.loads(calls[0]["state"]["conversation"][0]["text"])
     assert evidence["request"] == start.envelope.body
     assert evidence["response"] == end.result.response_text
     assert evidence["tools"][0]["name"] == "search_data"
     assert evidence["tools"][0]["status"] == "succeeded"
     assert "Official report" in evidence["tools"][0]["result"]
+    assert "shared_files" not in evidence
     end.message_sender.assert_awaited_once()
     sent = end.message_sender.call_args
     assert sent.args[0] == start.envelope.room_id
-    assert "@research" in sent.args[1]
-    assert "citations" in sent.args[1] and "source_use" in sent.args[1]
+    assert sent.args[1].startswith("@research — response audit flagged the following for review:\n- research: ")
+    assert sent.args[1].endswith(
+        'Please verify these findings in your reply that starts "The value is 42." '
+        "and correct that reply where needed; later replies are not part of this audit."
+    )
     assert sent.args[2] == "$thread"
     assert sent.kwargs["trigger_dispatch"] is True
     assert factory.call_args.args[0].provider == "typesafe"
@@ -150,7 +156,8 @@ async def test_records_evidence_and_posts_one_combined_same_thread_followup(turn
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "reason", ["disabled", "other", "team", "hook", "attachment", "non_ai", "empty", "missing_capture"]
+    "reason",
+    ["disabled", "other", "team", "hook", "scheduled", "external_trigger", "non_ai", "empty", "missing_capture"],
 )
 async def test_ineligible_responses_do_not_judge_or_send(turn, reason):
     start, end, calls, _ = turn
@@ -160,10 +167,12 @@ async def test_ineligible_responses_do_not_judge_or_send(turn, reason):
         start.envelope = replace(start.envelope, agent_name="other")
     if reason == "team":
         start.target_member_names = ("research",)
-    if reason == "hook":
-        start.envelope = replace(start.envelope, hook_source="response-audit-jev:message:after_response")
-    if reason == "attachment":
-        start.envelope = replace(start.envelope, attachment_ids=("image",))
+    if reason in {"hook", "scheduled", "external_trigger"}:
+        intent = {"hook": TurnIntent.HOOK_DISPATCH, "scheduled": TurnIntent.SCHEDULED_FIRE}.get(
+            reason, TurnIntent.EXTERNAL_TRIGGER
+        )
+        origin = replace(start.envelope.origin, intent=intent, source_kind=reason)
+        start.envelope = replace(start.envelope, origin=origin, hook_source="response-audit-jev:message:after_response")
     end.result = replace(end.result, envelope=start.envelope)
     if reason == "non_ai":
         end.result = replace(end.result, response_kind="command")
@@ -191,12 +200,47 @@ async def test_only_successful_positive_issue_judgments_post(turn, decision, fai
 
 
 @pytest.mark.asyncio
-async def test_no_source_tool_mapping_skips_source_check(turn):
+async def test_shared_files_are_named_for_the_judge(turn):
+    """Files reach the model without a tool call, so the judge sees their names; voice audio is not a source."""
+    from mindroom.attachments import register_bytes_attachment
+
     start, end, calls, _ = turn
-    start.settings["source_tools"] = []
+    for attachment_id, kind, filename, mime in (
+        ("att_q3", "file", "Q3-results.pdf", "application/pdf"),
+        ("att_voice", "audio", "voice-note.ogg", "audio/ogg"),
+    ):
+        register_bytes_attachment(
+            start.runtime_paths.storage_root,
+            b"payload",
+            kind=kind,
+            mime_type=mime,
+            attachment_id=attachment_id,
+            filename=filename,
+            room_id=start.envelope.room_id,
+            thread_id="$thread",
+            sender="@human:example.org",
+        )
+    start.envelope = replace(start.envelope, attachment_ids=("att_q3", "att_voice", "att_missing"))
+    end.result = replace(end.result, envelope=start.envelope)
     await hooks.begin_audit(start)
     await hooks.audit_response(end)
-    assert [c["question"]["id"] for c in calls] == ["citations"]
+    assert json.loads(calls[0]["state"]["conversation"][0]["text"])["shared_files"] == ["Q3-results.pdf"]
+
+
+@pytest.mark.asyncio
+async def test_followup_quote_skips_tool_markers_and_mentions(turn):
+    """The quote names the audited reply even after newer replies, without tagging anyone it mentions."""
+    from mindroom.tool_system.events import format_tool_combined
+
+    start, end, _, _ = turn
+    marker, _entry = format_tool_combined("web_search", {"query": "x"}, "no results", tool_index=1)
+    end.result = replace(end.result, response_text=f"{marker}\n\nAsk @other about Café Noir on Oudegracht 12.")
+    await hooks.begin_audit(start)
+    await hooks.audit_response(end)
+    sent = end.message_sender.call_args.args[1]
+    assert 'starts "Ask other about Café Noir on Oudegracht 12."' in sent
+    assert "web_search" not in sent
+    assert sent.count("@") == 1
 
 
 @pytest.mark.asyncio
@@ -221,6 +265,8 @@ async def test_custom_check_and_llm_backend(turn):
     await hooks.begin_audit(start)
     await hooks.audit_response(end)
     assert len(calls) == 1 and calls[0]["question"]["id"] == "units"
+    generic = "A clear, actionable violation is supported by the provided evidence."
+    assert calls[0]["question"]["criteria"]["true"] == generic
     assert factory.call_args.args[0].provider == "llm"
     assert "Add the measurement units." in end.message_sender.call_args.args[1]
 
@@ -273,7 +319,7 @@ async def test_durable_claim_blocks_replayed_response_even_with_new_capture(turn
     await hooks.audit_response(end)
     await hooks.begin_audit(start)
     await hooks.audit_response(end)
-    assert len(calls) == 2
+    assert len(calls) == 1
     end.message_sender.assert_awaited_once()
 
 
@@ -334,6 +380,7 @@ async def test_backend_exception_and_cancellation_never_post(turn):
         {"checks": []},
         {"agents": [""]},
         {"checks": [{"id": "x", "instructions": "Check", "feedback": "Fix"}] * 2},
+        {"source_tools": ["search_data"]},
     ],
 )
 def test_settings_reject_ambiguous_values(settings):
@@ -359,7 +406,7 @@ async def test_real_typesafe_adapter_uses_audit_questions_and_probability(turn, 
             200,
             json={
                 "model": payload["model"],
-                "answers": {check_id: {"type": "noul", "noul": 0.97 if check_id == "citations" else 0.1}},
+                "answers": {check_id: {"type": "noul", "noul": 0.97}},
                 "usage": {"input_tokens": 100, "output_tokens": 10},
             },
         )
@@ -372,9 +419,8 @@ async def test_real_typesafe_adapter_uses_audit_questions_and_probability(turn, 
     start.runtime_paths = end.runtime_paths = paths
     await hooks.begin_audit(start)
     await hooks.audit_response(end)
-    assert len(wire_requests) == 2
-    sent = end.message_sender.call_args.args[1]
-    assert "citations:" in sent and "source_use:" not in sent
+    assert len(wire_requests) == 1
+    assert "- research: " in end.message_sender.call_args.args[1]
 
 
 def test_plugin_loads_through_mindroom_contract():
@@ -420,4 +466,4 @@ async def test_delivery_failure_is_not_retried(turn):
     await hooks.begin_audit(start)
     await hooks.audit_response(end)
     end.message_sender.assert_awaited_once()
-    assert len(calls) == 2
+    assert len(calls) == 1
