@@ -245,6 +245,30 @@ async def test_followup_quote_skips_tool_markers_and_mentions(turn):
 
 
 @pytest.mark.asyncio
+async def test_findings_from_several_checks_share_one_followup(turn):
+    """Positive checks are combined into one message, and a failing check does not drop the others."""
+    start, end, _, factory = turn
+    start.settings["checks"] = [
+        {"id": id_, "instructions": f"Is {id_} wrong?", "feedback": f"Fix {id_}."}
+        for id_ in ("units", "dates", "names")
+    ]
+
+    async def evaluate(request):
+        check_id = json.loads(request.body)["question"]["id"]
+        if check_id == "dates":
+            raise RuntimeError("provider failure")
+        return JudgmentResult(True, 0.99, None, "test", 1, 10, 1, request.state_bytes)
+
+    factory.return_value = evaluate
+    await hooks.begin_audit(start)
+    await hooks.audit_response(end)
+    end.message_sender.assert_awaited_once()
+    sent = end.message_sender.call_args.args[1]
+    assert "- units: Fix units." in sent and "- names: Fix names." in sent
+    assert "dates" not in sent
+
+
+@pytest.mark.asyncio
 async def test_custom_check_and_llm_backend(turn):
     start, end, calls, factory = turn
     start.settings.update(
