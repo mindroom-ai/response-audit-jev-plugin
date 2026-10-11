@@ -133,6 +133,7 @@ async def test_records_evidence_and_posts_one_combined_same_thread_followup(turn
     assert len(calls) == 1
     assert calls[0]["question"]["id"] == "research"
     assert calls[0]["question"]["criteria"]["true"].startswith("The response states checkable facts")
+    assert calls[0]["question"]["criteria"]["false"].startswith("The response makes no such factual claims")
     evidence = json.loads(calls[0]["state"]["conversation"][0]["text"])
     assert evidence["request"] == start.envelope.body
     assert evidence["response"] == end.result.response_text
@@ -319,6 +320,7 @@ async def test_custom_check_and_llm_backend(turn):
     assert len(calls) == 1 and calls[0]["question"]["id"] == "units"
     generic = "A clear, actionable violation is supported by the provided evidence."
     assert calls[0]["question"]["criteria"]["true"] == generic
+    assert calls[0]["question"]["criteria"]["false"] == "No clear violation, not applicable, or insufficient evidence."
     assert factory.call_args.args[0].provider == "llm"
     assert "Add the measurement units." in end.message_sender.call_args.args[1]
 

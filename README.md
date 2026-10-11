@@ -35,7 +35,7 @@ Checks are configurable, so the same mechanism can review units, formatting, or 
 5. The agent handles that follow-up through MindRoom's normal permissions and dispatch flow.
 
 The audit requests verification; it does not prove an answer wrong.
-Missing or incomplete evidence stays quiet.
+A lost or incomplete turn capture stays quiet.
 The judge receives message and tool contents, so enable it only where sending those contents to the configured provider is appropriate.
 See [Evidence and Limits](docs/configuration.md#evidence-and-limits) for context bounds, privacy, and best-effort delivery behavior.
 
