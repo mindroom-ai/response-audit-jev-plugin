@@ -65,7 +65,7 @@ def turn(tmp_path, monkeypatch):
         origin=origin,
     )
     common = dict(
-        plugin_name="response-audit-jev",
+        plugin_name="response-audit",
         settings=settings,
         config=Config.model_validate(
             {"agents": {"research": {"display_name": "Research"}, "other": {"display_name": "Other"}}}
@@ -151,8 +151,9 @@ async def test_records_evidence_and_posts_one_combined_same_thread_followup(turn
     )
     assert sent.args[2] == "$thread"
     assert sent.kwargs["trigger_dispatch"] is True
-    assert factory.call_args.args[0].provider == "typesafe"
-    assert factory.call_args.args[0].threshold == 0.9
+    assert factory.call_args.args[0].provider == "openai_decisions"
+    assert factory.call_args.args[0].threshold == 0.8
+    assert factory.call_args.args[0].timeout_seconds == 5
 
 
 @pytest.mark.asyncio
@@ -469,6 +470,7 @@ async def test_real_typesafe_adapter_uses_audit_questions_and_probability(turn, 
     real_client = httpx.AsyncClient
     monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: real_client(**{**kwargs, "transport": transport}))
     monkeypatch.setattr(hooks, "create_judgment_evaluator", evaluator.create_judgment_evaluator)
+    start.settings["judgment"] = {"provider": "typesafe", "threshold": 0.9}
     paths = replace(start.runtime_paths, process_env={"TYPESAFE_API_KEY": "synthetic-key"})
     start.runtime_paths = end.runtime_paths = paths
     await hooks.begin_audit(start)
@@ -482,7 +484,7 @@ def test_plugin_loads_through_mindroom_contract():
     from mindroom.plugin_check import check_plugin
 
     result = check_plugin(ROOT)
-    assert result.name == "response-audit-jev"
+    assert result.name == "response-audit"
     assert result.hook_names == (
         "audit-response",
         "begin-response-audit",

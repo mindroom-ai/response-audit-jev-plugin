@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from mindroom.config.judgment import JudgmentConfig, TypeSafeJudgmentConfig
+from mindroom.config.judgment import JudgmentConfig, OpenAIDecisionsJudgmentConfig
 from mindroom.judgment.state import JudgmentMessage, JudgmentQuestion, JudgmentRequest, build_judgment_request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -63,7 +63,10 @@ class AuditSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
     agents: list[Name] = Field(default_factory=list, max_length=100)
-    judgment: JudgmentConfig = Field(default_factory=lambda: TypeSafeJudgmentConfig(provider="typesafe", threshold=0.9))
+    # The evaluated backend; slow periods exceed the 1.5-second judgment default, and a timeout gives no finding.
+    judgment: JudgmentConfig = Field(
+        default_factory=lambda: OpenAIDecisionsJudgmentConfig(provider="openai_decisions", timeout_seconds=5.0)
+    )
     checks: tuple[AuditCheck, ...] = Field(default=DEFAULT_CHECKS, min_length=1, max_length=8)
 
     @model_validator(mode="after")

@@ -21,7 +21,7 @@ The judge does not generate correction prose.
 
 ```yaml
 plugins:
-  - path: ./plugins/response-audit-jev-plugin
+  - path: ./plugins/response-audit-plugin
     settings:
       agents: [research]
       checks:
@@ -35,7 +35,7 @@ plugins:
 | Setting | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `agents` | list of names | `[]` | Agents enabled for audits; maximum 100 |
-| `judgment` | object | TypeSafe, threshold `0.9`, timeout `1.5` seconds | Existing MindRoom judgment configuration |
+| `judgment` | object | OpenAI Decisions, threshold `0.8`, timeout `5` seconds | Existing MindRoom judgment configuration |
 | `checks` | list | The `research` check | Between 1 and 8 checks, with unique IDs |
 | `checks[].id` | string | Required | Check identifier, 1–100 letters, digits, underscores or hyphens |
 | `checks[].instructions` | string | Required | Violation question, 1–2,000 characters |
@@ -47,8 +47,9 @@ Unknown settings are rejected when hooks validate their configuration.
 When upgrading from a version with the `citations` and `source_use` checks, remove `source_tools` and any `requires_source_tools` from the plugin settings, or every audit fails validation.
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
-To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions, timeout_seconds: 5}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
-The evaluation used a 5-second or longer timeout: slow periods exceed the 1.5-second default, and a timeout produces no finding.
+The default OpenAI Decisions backend uses the instance's OpenAI API key, from `OPENAI_API_KEY` or the dashboard.
+Its 5-second timeout matches the evaluation: slow periods exceed MindRoom's 1.5-second judgment default, and a timeout produces no finding.
+To use TypeSafe JEV, set `judgment: {provider: typesafe, threshold: 0.9}` and provide a `TYPESAFE_API_KEY`.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
 ```yaml
