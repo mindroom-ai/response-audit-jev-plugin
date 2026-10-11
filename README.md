@@ -1,4 +1,4 @@
-# Response Audit JEV
+# Response Audit
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-plugins-blue)](https://docs.mindroom.chat/plugins/)
@@ -9,7 +9,7 @@
   <img src="https://raw.githubusercontent.com/mindroom-ai/mindroom/main/assets/logo/logo-mark.svg" alt="MindRoom Logo" align="right" width="120" />
 </picture>
 
-A [MindRoom](https://github.com/mindroom-ai/mindroom) hook plugin that uses [TypeSafe JEV](https://docs.typesafe.ai/api) to check completed answers and ask the responding agent to correct likely problems.
+A [MindRoom](https://github.com/mindroom-ai/mindroom) hook plugin that uses a judgment backend, the OpenAI Decisions API by default, to check completed answers and ask the responding agent to correct likely problems.
 
 The agent answers first.
 The plugin checks whether the answer states facts that no recorded lookup supported, then posts one follow-up in the same thread, tagging the agent with specific correction guidance.
@@ -19,7 +19,7 @@ Checks are configurable, so the same mechanism can review units, formatting, or 
 
 - Audits selected agents after their answers are delivered
 - Includes a research check chosen by labeled replies on real models, with support for custom questions
-- Uses JEV by default, or the OpenAI Decisions API or an existing MindRoom LLM model alias
+- Uses the OpenAI Decisions API by default, or TypeSafe JEV or an existing MindRoom LLM model alias
 - Checks recorded tool activity instead of treating the agent's lookup claims as evidence
 - Combines findings into one same-thread follow-up that mentions the agent
 - Skips hook-generated correction turns to prevent audit loops
@@ -50,21 +50,21 @@ See [Evidence and Limits](docs/configuration.md#evidence-and-limits) for context
 
 ## Requirements
 
-MindRoom **v2026.10.205 or newer**, Python 3.13 or newer, and a `TYPESAFE_API_KEY` for JEV.
-An LLM judge uses the configured model alias's normal credentials instead.
+MindRoom **v2026.10.205 or newer**, Python 3.13 or newer, and an OpenAI API key for the default OpenAI Decisions backend.
+TypeSafe JEV needs a `TYPESAFE_API_KEY`, and an LLM judge uses the configured model alias's normal credentials.
 
 ## Install
 
 Vendor this plugin with the MindRoom CLI:
 
 ```bash
-mindroom plugins install response-audit-jev-plugin
+mindroom plugins install response-audit-plugin
 ```
 
 Update to the latest commit later with:
 
 ```bash
-mindroom plugins update response-audit-jev-plugin
+mindroom plugins update response-audit-plugin
 ```
 
 The command pins the exact installed commit in `.mindroom-plugin.lock.json` and strictly validates the plugin before activating it.
@@ -72,18 +72,14 @@ For a manual checkout, clone this repository into your `plugins/` directory.
 
 ## Setup
 
-1. Set `TYPESAFE_API_KEY` in the MindRoom instance environment or config-adjacent `.env`.
+1. Make sure the instance has an OpenAI API key, from `OPENAI_API_KEY` or the dashboard.
 2. Add the plugin to `config.yaml` and select the agents to audit:
 
    ```yaml
    plugins:
-     - path: plugins/response-audit-jev-plugin
+     - path: plugins/response-audit-plugin
        settings:
          agents: [research]
-         judgment:
-           provider: typesafe
-           threshold: 0.9
-           timeout_seconds: 1.5
    ```
 
 3. Restart MindRoom or let its normal config reload apply the change.
@@ -91,7 +87,8 @@ For a manual checkout, clone this repository into your `plugins/` directory.
 No agent tools are required.
 `agents` defaults to `[]`, so installation alone audits nobody.
 Settings follow selected agents across authorized rooms; teams are excluded.
-To use the OpenAI Decisions API instead of JEV, set `judgment: {provider: openai_decisions, timeout_seconds: 5}`; it uses the instance's OpenAI API key.
+The default judgment is `{provider: openai_decisions, threshold: 0.8, timeout_seconds: 5}`, the configuration the evaluation measured.
+To use TypeSafe JEV instead, set `judgment: {provider: typesafe, threshold: 0.9}`; it was not measured.
 The probability threshold is a starting point, not a calibrated accuracy guarantee.
 
 See [Configuration and Custom Checks](docs/configuration.md) for all settings, LLM configuration, custom questions, and development commands.

@@ -19,5 +19,5 @@ jobs:
     with:
       plugin_repository: ${{ github.repository }}
       plugin_ref: ${{ github.sha }}
-      artifact_name: response-audit-jev-plugin
+      artifact_name: response-audit-plugin
       require_tests: true

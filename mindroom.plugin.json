@@ -1,4 +1,4 @@
 {
-  "name": "response-audit-jev",
+  "name": "response-audit",
   "hooks_module": "hooks.py"
 }
