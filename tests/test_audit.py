@@ -201,13 +201,14 @@ async def test_only_successful_positive_issue_judgments_post(turn, decision, fai
 
 @pytest.mark.asyncio
 async def test_shared_files_are_named_for_the_judge(turn):
-    """Files reach the model without a tool call, so the judge sees their names; voice audio is not a source."""
+    """The judge sees names of files shared in this room; voice audio and other rooms' files are not listed."""
     from mindroom.attachments import register_bytes_attachment
 
     start, end, calls, _ = turn
-    for attachment_id, kind, filename, mime in (
-        ("att_q3", "file", "Q3-results.pdf", "application/pdf"),
-        ("att_voice", "audio", "voice-note.ogg", "audio/ogg"),
+    for attachment_id, kind, filename, mime, room_id in (
+        ("att_q3", "file", "Q3-results.pdf", "application/pdf", start.envelope.room_id),
+        ("att_voice", "audio", "voice-note.ogg", "audio/ogg", start.envelope.room_id),
+        ("att_elsewhere", "file", "other-room.pdf", "application/pdf", "!elsewhere:example.org"),
     ):
         register_bytes_attachment(
             start.runtime_paths.storage_root,
@@ -216,11 +217,11 @@ async def test_shared_files_are_named_for_the_judge(turn):
             mime_type=mime,
             attachment_id=attachment_id,
             filename=filename,
-            room_id=start.envelope.room_id,
+            room_id=room_id,
             thread_id="$thread",
             sender="@human:example.org",
         )
-    start.envelope = replace(start.envelope, attachment_ids=("att_q3", "att_voice", "att_missing"))
+    start.envelope = replace(start.envelope, attachment_ids=("att_q3", "att_voice", "att_elsewhere", "att_missing"))
     end.result = replace(end.result, envelope=start.envelope)
     await hooks.begin_audit(start)
     await hooks.audit_response(end)

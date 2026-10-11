@@ -46,10 +46,13 @@ def _eligible(envelope: MessageEnvelope, settings: AuditSettings) -> bool:
     )
 
 
-def _shared_file_names(storage_root: Path, attachment_ids: tuple[str, ...]) -> list[str]:
+def _shared_file_names(storage_root: Path, room_id: str, attachment_ids: tuple[str, ...]) -> list[str]:
     # The model reads shared files without tool calls; voice audio is already transcribed into the request.
+    # Envelope IDs can fall back to unscoped ones, so another room's file names never reach the judge.
     records = resolve_attachments(storage_root, list(attachment_ids))
-    return [record.filename or record.kind for record in records if record.kind != "audio"]
+    return [
+        record.filename or record.kind for record in records if record.kind != "audio" and record.room_id == room_id
+    ]
 
 
 def _reply_opening(response: str) -> str:
@@ -111,7 +114,9 @@ async def audit_response(ctx: AfterResponseContext) -> None:
     ):
         return
     shared_files = (
-        await asyncio.to_thread(_shared_file_names, ctx.runtime_paths.storage_root, envelope.attachment_ids)
+        await asyncio.to_thread(
+            _shared_file_names, ctx.runtime_paths.storage_root, envelope.room_id, envelope.attachment_ids
+        )
         if envelope.attachment_ids
         else []
     )

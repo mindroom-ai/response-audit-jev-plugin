@@ -46,7 +46,7 @@ plugins:
 Unknown settings are rejected when hooks validate their configuration.
 Agent names accept 1–100 letters, digits, underscores or hyphens.
 Changing check settings takes effect through MindRoom's normal plugin config reload.
-To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}`; it uses the instance's OpenAI API key, and its default threshold is `0.8`.
+To use the OpenAI Decisions API, set `judgment: {provider: openai_decisions}` (MindRoom v2026.10.205 or newer); it uses the instance's OpenAI API key, and its default threshold is `0.8`.
 To use an LLM, replace `judgment` with an existing alias under `models`:
 
 ```yaml
@@ -98,16 +98,16 @@ The ledger is retained until its state directory is removed; it stores no messag
 ## Evaluation
 
 The default check was chosen on 38 labeled replies: unresearched recommendations and corporate claims, replies backed by searches, page reads, or shared files, and replies with no factual claims.
-A reply counts as handled correctly when it gets a follow-up exactly when it states facts no lookup or shared file supports.
+A reply counts as handled correctly when it gets a follow-up exactly when it states facts no lookup or shared file supports; a timeout or abstention counts as no follow-up.
 
 | Checks | OpenAI Decisions (threshold 0.8) | gpt-6-luna, 3 runs | gpt-6.1-sol, 3 runs |
 | --- | --- | --- | --- |
-| Previous defaults (`citations`, plus `source_use`), skipping attachments | 13 of 38 wrong | 12 to 16 of 114 wrong | 24 of 114 wrong |
-| `research` | 2 of 38 wrong | 3 of 114 wrong | 1 of 114 wrong |
+| Previous defaults (`citations`, plus `source_use`), skipping attachments | 13 of 38 wrong | 17 of 114 wrong | 25 of 114 wrong |
+| `research` | 2 of 38 wrong | 5 of 114 wrong | 2 of 114 wrong |
 
 The previous checks missed most unresearched recommendations and flagged replies whose searches supported them, because `citations` asks for citations in the answer rather than lookups.
 Borderline replies, such as an opinion added to a supported answer, can move across the threshold with small wording changes, so treat their outcome as uncertain.
-With a newer reply between the audited answer and the follow-up, quoting the audited answer made gpt-6-luna and gpt-6.1-sol verify the right answer 12 of 12 times, against 0 of 12 with the previous wording.
+With a newer reply between the audited answer and the follow-up, a tool-free probe asked each model which claims it would check: with the audited answer quoted, gpt-6-luna and gpt-6.1-sol picked claims from that answer 12 of 12 times, against 0 of 12 with the previous wording.
 TypeSafe JEV was not measured because no key was available.
 
 ## Development
