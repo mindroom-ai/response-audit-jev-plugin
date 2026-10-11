@@ -229,6 +229,33 @@ async def test_shared_files_are_named_for_the_judge(turn):
 
 
 @pytest.mark.asyncio
+async def test_transcribed_voice_turn_is_audited_without_listing_its_audio(turn):
+    """Voice messages, which arrive as trusted relays carrying their audio attachment, are audited."""
+    from mindroom.attachments import register_bytes_attachment
+
+    start, end, calls, _ = turn
+    register_bytes_attachment(
+        start.runtime_paths.storage_root,
+        b"payload",
+        kind="audio",
+        mime_type="audio/ogg",
+        attachment_id="att_voice",
+        filename="voice-note.ogg",
+        room_id=start.envelope.room_id,
+        thread_id="$thread",
+        sender="@human:example.org",
+    )
+    origin = replace(start.envelope.origin, intent=TurnIntent.TRUSTED_INTERNAL_RELAY, source_kind="voice")
+    start.envelope = replace(start.envelope, origin=origin, attachment_ids=("att_voice",))
+    end.result = replace(end.result, envelope=start.envelope)
+    await hooks.begin_audit(start)
+    await hooks.audit_response(end)
+    assert len(calls) == 1
+    assert "shared_files" not in json.loads(calls[0]["state"]["conversation"][0]["text"])
+    end.message_sender.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_followup_quote_skips_tool_markers_and_mentions(turn):
     """The quote names the audited reply even after newer replies, without tagging anyone it mentions."""
     from mindroom.tool_system.events import format_tool_combined
