@@ -8,7 +8,7 @@
 | --- | --- |
 | `research` | Checkable facts a person would act on, such as what a place, company, document, law, or study is, says, costs, or reports, that the recorded tool calls did not look up or do not support |
 
-Facts the person supplied, directly or in shared files, general advice about something the person named, stable common knowledge, opinions, and pointers to where information can be found do not count.
+Facts the person supplied in the audited message or in shared files, general advice about something the person named, stable common knowledge, opinions, and pointers to where information can be found do not count.
 A successful tool call is evidence that a function returned, not proof that every claim in its result is correct.
 The judge also inspects the result and relevance to the request.
 
@@ -79,7 +79,7 @@ The plugin watches `message:enrich`, `tool:after_call`, `message:after_response`
 It uses public hooks and adds no new core hook or agent tool.
 It does not browse citations itself and cannot prove factual correctness.
 Earlier conversation sources, provider-native tools, delegated work, and tool activity outside the observed turn are not fully visible.
-The `research` check sees only this turn's tool calls, so an answer that repeats facts looked up earlier in the thread, by provider-native tools, or by delegated work can still get a follow-up.
+The judge sees only the audited message, the names of shared files, and this turn's tool calls, so facts from earlier messages or lookups in the thread, the agent's instructions, context files, or memory, provider-native tools, or delegated work can draw a follow-up, and a fact added beside a shared file can be credited to that file.
 
 Audits are skipped for missing turn capture, unsupported non-JSON tool results, detected secrets, oversized input, non-AI/empty responses, and turns no person asked for, such as schedules, webhooks, and messages from agents or plugins.
 Evidence is never silently truncated: at most 32 tool observations and a 16 KB shared judgment request.
@@ -100,7 +100,7 @@ The ledger is retained until its state directory is removed; it stores no messag
 
 ## Evaluation
 
-The default check was chosen on 38 labeled replies: unresearched recommendations and corporate claims, replies backed by searches, page reads, or shared files, and replies with no factual claims.
+The default check was chosen on 38 labeled single-message exchanges: unresearched recommendations and corporate claims, replies backed by searches, page reads, or shared files, and replies with no factual claims.
 A reply counts as handled correctly when it gets a follow-up exactly when it states facts no lookup or shared file supports; a timeout or abstention counts as no follow-up.
 
 | Checks | OpenAI Decisions (threshold 0.8) | gpt-6-luna, 3 runs | gpt-6.1-sol, 3 runs |
