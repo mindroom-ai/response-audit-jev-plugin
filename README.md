@@ -50,7 +50,7 @@ See [Evidence and Limits](docs/configuration.md#evidence-and-limits) for context
 
 ## Requirements
 
-MindRoom **v2026.10.205 or newer**, Python 3.13 or newer, and an OpenAI API key for the default OpenAI Decisions backend.
+MindRoom **v2026.10.258 or newer**, Python 3.13 or newer, and an OpenAI API key for the default OpenAI Decisions backend.
 TypeSafe JEV needs a `TYPESAFE_API_KEY`, and an LLM judge uses the configured model alias's normal credentials.
 
 ## Install

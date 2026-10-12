@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from mindroom.attachments import resolve_attachments
+from mindroom.attachments.storage import resolve_attachments
 from mindroom.hooks import (
     AfterResponseContext,
     CancelledResponseContext,
