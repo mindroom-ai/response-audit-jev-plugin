@@ -129,5 +129,5 @@ uv run --project ../mindroom pre-commit run --all-files
 ```
 
 On NixOS, run these inside the MindRoom `shell.nix` environment.
-CI uses MindRoom's reusable plugin compatibility workflow pinned to `v2026.10.205`.
+CI uses MindRoom's reusable plugin compatibility workflow pinned to `v2026.10.258`.
 Tests exercise real hook contexts and mock the provider/network boundary; they do not establish live judgment accuracy or a calibrated threshold.
