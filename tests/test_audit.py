@@ -204,7 +204,7 @@ async def test_only_successful_positive_issue_judgments_post(turn, decision, fai
 @pytest.mark.asyncio
 async def test_shared_files_are_named_for_the_judge(turn):
     """The judge sees names of files shared in this room; voice audio and other rooms' files are not listed."""
-    from mindroom.attachments import register_bytes_attachment
+    from mindroom.attachments.storage import register_bytes_attachment
 
     start, end, calls, _ = turn
     for attachment_id, kind, filename, mime, room_id in (
@@ -233,7 +233,7 @@ async def test_shared_files_are_named_for_the_judge(turn):
 @pytest.mark.asyncio
 async def test_transcribed_voice_turn_is_audited_without_listing_its_audio(turn):
     """Voice messages, which arrive as trusted relays carrying their audio attachment, are audited."""
-    from mindroom.attachments import register_bytes_attachment
+    from mindroom.attachments.storage import register_bytes_attachment
 
     start, end, calls, _ = turn
     register_bytes_attachment(
